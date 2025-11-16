@@ -1,21 +1,70 @@
 package main
 
 import (
-  "fmt"
+	"encoding/json"
+	"log"
+	"net/http"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
-//TIP <p>To run your code, right-click the code and select <b>Run</b>.</p> <p>Alternatively, click
-// the <icon src="AllIcons.Actions.Execute"/> icon in the gutter and select the <b>Run</b> menu item from here.</p>
+// Sadece örnek amaçlı: normalde DB'den okursun.
+type User struct {
+	Email        string
+	PasswordHash string
+}
+
+var users = map[string]User{
+	"test@example.com": {
+		Email: "test@example.com",
+		// "password123" için yaratılmış hash varsayalım
+		PasswordHash: "$2a$10$CiQFHXMS5uOBwH2vwT3ghOZ1ZxJmN3TgRjkBvw0n2.DrV6L5q8p5a",
+	},
+}
+
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type LoginResponse struct {
+	Token string `json:"token"`
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "only POST allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	user, ok := users[req.Email]
+	if !ok {
+		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	// Şifre doğrulama
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	// Gerçekte burada JWT veya benzeri token üretmen gerekir.
+	token := "fake-jwt-token-example"
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(LoginResponse{Token: token})
+}
 
 func main() {
-  //TIP <p>Press <shortcut actionId="ShowIntentionActions"/> when your caret is at the underlined text
-  // to see how GoLand suggests fixing the warning.</p><p>Alternatively, if available, click the lightbulb to view possible fixes.</p>
-  s := "gopher"
-  fmt.Printf("Hello and welcome, %s!\n", s)
+	http.HandleFunc("/login", loginHandler)
 
-  for i := 1; i <= 5; i++ {
-	//TIP <p>To start your debugging session, right-click your code in the editor and select the Debug option.</p> <p>We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-	// for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.</p>
-	fmt.Println("i =", 100/i)
-  }
+	log.Println("Server listening on :8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
