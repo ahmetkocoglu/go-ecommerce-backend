@@ -1,0 +1,29 @@
+# IDE / Editor
+.idea/
+.vscode/
+*.iml
+
+# OS dosyaları
+.DS_Store
+Thumbs.db
+
+# Go build output
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go mod cache (genelde ignore edilmez ama local cache'ler için)
+vendor/
+
+# Log / temp
+*.log
+*.tmp
+*.swp
+
+# Coverage / test output
+coverage.*
+*.coverprofile
