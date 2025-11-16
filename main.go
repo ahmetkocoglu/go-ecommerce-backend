@@ -4,9 +4,14 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
+	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// JWT için gizli anahtar (production'da environment variable kullanın!)
+var jwtSecret = []byte("your-secret-key-change-this-in-production")
 
 // Sadece örnek amaçlı: normalde DB'den okursun.
 type User struct {
@@ -18,7 +23,7 @@ var users = map[string]User{
 	"test@example.com": {
 		Email: "test@example.com",
 		// "password123" için yaratılmış hash varsayalım
-		PasswordHash: "$2a$10$CiQFHXMS5uOBwH2vwT3ghOZ1ZxJmN3TgRjkBvw0n2.DrV6L5q8p5a",
+		PasswordHash: "$2a$10$y8.LpuQNdPy0jFCe89/KgOZ9vKZKCp/sLVDnOpRHBYWc69bOApvIS",
 	},
 }
 
@@ -29,6 +34,38 @@ type LoginRequest struct {
 
 type LoginResponse struct {
 	Token string `json:"token"`
+}
+
+// JWT Claims yapısı
+type Claims struct {
+	Email string `json:"email"`
+	jwt.RegisteredClaims
+}
+
+// JWT token oluşturma fonksiyonu
+func generateJWT(email string) (string, error) {
+	// Token 24 saat geçerli olacak
+	expirationTime := time.Now().Add(24 * time.Hour)
+
+	claims := &Claims{
+		Email: email,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Subject:   email,
+		},
+	}
+
+	// Token oluştur
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	// Token'ı imzala ve string'e çevir
+	tokenString, err := token.SignedString(jwtSecret)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
@@ -55,8 +92,12 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Gerçekte burada JWT veya benzeri token üretmen gerekir.
-	token := "fake-jwt-token-example"
+	// JWT token üret
+	token, err := generateJWT(user.Email)
+	if err != nil {
+		http.Error(w, "error generating token", http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(LoginResponse{Token: token})
